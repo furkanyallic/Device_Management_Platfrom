@@ -1,9 +1,11 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy,Logger} from '@nestjs/common';
 import { KafkaService } from './kafka.service';
 import { timestamp } from 'rxjs';
+import { RabbitMQService } from './rabbitmq.service';
 
 @Injectable()
 export class SimulatorService implements OnModuleInit,OnModuleDestroy{
+    private readonly logger = new Logger(SimulatorService.name);
     private intervalId:NodeJS.Timeout
 
     private sampleDeviceIds=[
@@ -12,7 +14,10 @@ export class SimulatorService implements OnModuleInit,OnModuleDestroy{
         '7b9e2101-3a11-49b8-b456-9d8e7f6a5b4c',
     ];
 
-    constructor(private readonly KafkaService:KafkaService){}//Kafka servis provider'ı bulunuyor hem de arkada nestJs Kafkaservice'in instance'ını oluşturuyor.
+    constructor(
+        private readonly KafkaService:KafkaService,
+        private readonly RabbbitMQService:RabbbitMQService
+     ){}//Kafka servis provider'ı bulunuyor hem de arkada nestJs Kafkaservice'in instance'ını oluşturuyor.
 
     onModuleInit(){
         this.intervalId=setInterval(()=>{
@@ -28,26 +33,29 @@ export class SimulatorService implements OnModuleInit,OnModuleDestroy{
     }  
       private async generateAndSendTelemetry(){
         const topic='iot.telemetry.raw'
+        const routingKey='telemetry.data'
         for(const deviceId of this.sampleDeviceIds){
 
             const payload={
                 deviceId,
                 timestamp:new Date().toISOString(),
                 metrics:{
-                    temperature:0,
-                    humidity:0,
-                    voltage:0,
-                    current:0,
-                    power:0,
-                    frequency:0,
-                    pressure:0,
-                    vibration:0,
-                    batteryLevel:0
+                temperature: parseFloat((20 + Math.random() * 70).toFixed(2)), // 20 - 90 °C
+                humidity: parseFloat((30 + Math.random() * 50).toFixed(2)),    // %30 - %80
+                voltage: parseFloat((210 + Math.random() * 30).toFixed(2)),    // 210 - 240 V
+                current: parseFloat((1 + Math.random() * 15).toFixed(2)),      // 1 - 16 A
+                power: parseFloat((100 + Math.random() * 2000).toFixed(2)),   // 100 - 2100 W
+                frequency: 50,
+                pressure: parseFloat((0.9 + Math.random() * 0.3).toFixed(2)),
+                vibration: parseFloat((0.1 + Math.random() * 2.5).toFixed(2)),
+                batteryLevel: Math.floor(20 + Math.random() * 80),
                 }
             }
             try{
                 await this.KafkaService.sendTelemetry(topic,deviceId,payload)
-                console.log(`Telemetry gönderildi device : ${deviceId}`)
+
+                await this.RabbbitMQService.sendTelemetry(routingKey,payload)
+                this.logger.log(`Telemetry gönderildi device : ${deviceId}`)
             }catch(error){
                 console.error(`Telemetry gönderim hatası ($deviceId)`,error)
             }

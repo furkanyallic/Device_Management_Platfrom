@@ -4,6 +4,8 @@ import { AppService } from './app.service';
 import { SimulatorService } from './simulator.service';
 import { KafkaService } from './kafka.service';
 import { ConfigModule } from '@nestjs/config';
+import { RabbitMQService } from './rabbitmq.service';
+
 
 @Module({
   imports: [
@@ -12,6 +14,6 @@ import { ConfigModule } from '@nestjs/config';
     }),
   ],
   controllers: [],
-  providers: [KafkaService, SimulatorService],
+  providers: [KafkaService, SimulatorService,RabbitMQService,],
 })
 export class AppModule {}

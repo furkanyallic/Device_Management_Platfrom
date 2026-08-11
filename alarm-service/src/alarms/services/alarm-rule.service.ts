@@ -12,25 +12,25 @@ export class AlarmRuleService {
     private readonly ruleRepository: Repository<AlarmRuleEntity>,
   ) {}
 
-  // 1. Yeni Kural Oluştur
+  //  Yeni kural oluştur
   async create(createDto: CreateAlarmRuleDto): Promise<AlarmRuleEntity> {
     const rule = this.ruleRepository.create(createDto);
     return await this.ruleRepository.save(rule);
   }
 
-  // 2. Tüm Kuralları Getir
+  //  Tüm kuralları getir
   async findAll(): Promise<AlarmRuleEntity[]> {
     return await this.ruleRepository.find();
   }
 
-  // 3. Cihaza Göre Kuralları Getir (Simülatör veriyi kontrol ederken bu fonksiyonu kullanacağız)
+  // Cihaza Göre Kuralları Getir (Simülatör veriyi kontrol ederken bu fonksiyonu kullanacağız)
   async findByDeviceId(deviceId: string): Promise<AlarmRuleEntity[]> {
     return await this.ruleRepository.find({
       where: { deviceId, isActive: true },
     });
   }
 
-  // 4. Tek Bir Kural Detayı Getir
+  // tek bir kural getir
   async findOne(id: string): Promise<AlarmRuleEntity> {
     const rule = await this.ruleRepository.findOne({ where: { id } });
     if (!rule) {
@@ -39,7 +39,7 @@ export class AlarmRuleService {
     return rule;
   }
 
-  // 5. Kural Güncelle
+  // 5. kural güncelle
   async update(
     id: string,
     updateDto: UpdateAlarmRuleDto,

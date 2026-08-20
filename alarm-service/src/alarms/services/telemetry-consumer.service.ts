@@ -8,6 +8,8 @@ import { AlarmRuleService } from './alarm-rule.service';
 import { AlarmService } from './alarm-service';
 import * as amqp from 'amqplib';
 import { AlarmSeverity } from 'src/common/enums/alarm-severity';
+import { title } from 'process';
+import { NotificationProducerService } from './notification-producer.service';
 
 @Injectable()
 export class TelemetryConsumerService implements OnModuleInit, OnModuleDestroy {
@@ -22,6 +24,7 @@ export class TelemetryConsumerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly alarmRuleService: AlarmRuleService,
     private readonly alarmService: AlarmService,
+    private readonly notificationProducerService: NotificationProducerService,
   ) {
     console.log('alarmRuleService enjekte edildi mi?', !!this.alarmRuleService);
   }
@@ -101,13 +104,21 @@ export class TelemetryConsumerService implements OnModuleInit, OnModuleDestroy {
           );
 
           //db'de otomatik alarm oluştur
-          await this.alarmService.create({
+          const savedAlarm = await this.alarmService.create({
             deviceId,
             ruleId: rule.id,
             title: `${rule.metricName.toUpperCase()} eşik değeri aşıldi`,
             description: `${rule.metricName} metriği ${metricValue} değerine ulaştı`,
             severity: rule.severity || AlarmSeverity.WARNING,
             triggerValue: metricValue,
+          });
+          await this.notificationProducerService.sendAlarmNotification({
+            alarmId: savedAlarm.id,
+            deviceId: savedAlarm.deviceId,
+            ruleName: rule.metricName,
+            severity: savedAlarm.severity,
+            triggerValue: savedAlarm.triggerValue,
+            threshold: rule.threshold,
           });
         }
       }

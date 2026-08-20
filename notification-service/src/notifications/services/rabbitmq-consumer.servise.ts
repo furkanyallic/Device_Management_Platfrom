@@ -49,7 +49,7 @@ export class RabbitMQConsumerService implements OnModuleInit, OnModuleDestroy {
             //Bildirim servisini tetikliyoruz
             await this.notificationService.sendAlarmNotification(payload);
 
-            //Başarıyla işlendğini onaylıyoruz (ack)
+            //Başarıyla işlendğini onaylıyoruz (ack),mesaj kuruktan silinir
             this.channel.ack(msg);
           } catch (error) {
             this.logger.error('Mesaj işlenirken hata oluştu', error);

@@ -12,7 +12,7 @@ export class EmailService {
     try {
       this.logger.log(`Eposta gönderiliyor ${to}`);
       this.logger.log(`Konu ${subject}`);
-      this.logger.debug(`İçerik ${content}`);
+      this.logger.debug(`İçerik${content}`);
 
       return true;
     } catch (error) {

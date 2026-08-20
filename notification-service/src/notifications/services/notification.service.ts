@@ -14,6 +14,7 @@ export interface SendAlarmEmailPayload {
   threshold: number;
   metricType?: string;
 }
+
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
@@ -27,14 +28,14 @@ export class NotificationService {
     payload: SendAlarmEmailPayload,
   ): Promise<NotificationEntity> {
     const recipientEmail = process.env.ADMIN_EMAIL || 'admin18@gmail.com';
-    const subject = `[{payload.severity}] iot cihaz alarmı ,cihaz: ${payload.deviceId}`;
+    const subject = `[ ${payload.severity}] iot cihaz alarmı ,cihaz: ${payload.deviceId}`;
 
     const content = `
     Bir alarm tetiklendi: ${payload.alarmId},
-    cihaz id'si :${payload.deviceId},
-    Alarm şiddeti:{payload.severity},
+    Cihaz id'si :${payload.deviceId},
+    Alarm şiddeti:${payload.severity},
     Eşik değeri:${payload.threshold},
-    Zaman:{new Date().localeString}`.trim();
+    Zaman:${new Date().toLocaleString()}`.trim();
 
     const isSent = await this.emailService.sendEmail(
       recipientEmail,

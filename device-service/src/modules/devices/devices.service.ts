@@ -30,7 +30,7 @@ export class DevicesService {
     const newDevice = this.deviceRepository.create(createDeviceDto);
     const savedDevice = await this.deviceRepository.save(newDevice); //Db 'ye kaydettiğimiz kısım
 
-    await this.redisService.addDevice(savedDevice.id);
+    await this.redisService.addDevice(savedDevice.id, savedDevice.name);
 
     return savedDevice;
   }

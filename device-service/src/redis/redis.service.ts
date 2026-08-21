@@ -18,25 +18,48 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.client.on('connect', () =>
-      this.logger.log('Redis bağlantısı başarılı(device-service)'),
+      this.logger.log('Redis bağlantısı başarılı (device-service)'),
     );
-    this.client.on('error', (err) => this.logger.log('Redis hatası', err));
+    this.client.on('error', (err) => this.logger.error('Redis hatası', err));
   }
 
-  //yeni cihaz ekleme
-  async addDevice(deviceId: string) {
-    await this.client.sadd('active_devices', deviceId);
-    await this.client.publish('device.created', deviceId);
-    this.logger.log(`Yeni cihaz redis' kaydedildi${deviceId}`);
+  // Yeni cihaz ekleme (ID + Name ile)
+  async addDevice(deviceId: string, deviceName: string) {
+    const payload = JSON.stringify({ id: deviceId, name: deviceName });
+
+    // 1. Set'e JSON olarak ekle
+    await this.client.sadd('active_devices', payload);
+    // 2. Pub/Sub kanalına JSON yayınla
+    await this.client.publish('device.created', payload);
+
+    this.logger.log(
+      `Yeni cihaz Redis'e kaydedildi: ${deviceName} (${deviceId})`,
+    );
   }
 
+  // Cihaz silme
   async removeDevice(deviceId: string) {
-    await this.client.srem('active_devices', deviceId);
+    // Set içindeki JSON elemanları arasından bu ID'ye sahip olanı bulup sil
+    const members = await this.client.smembers('active_devices');
+    for (const member of members) {
+      try {
+        const parsed = JSON.parse(member);
+        if (parsed.id === deviceId || member === deviceId) {
+          await this.client.srem('active_devices', member);
+        }
+      } catch {
+        if (member === deviceId) {
+          await this.client.srem('active_devices', member);
+        }
+      }
+    }
+
+    // Pub/Sub kanalına silme olayını bildir
     await this.client.publish('device.deleted', deviceId);
-    this.logger.log(`cihaz redis'ten  kladırıldı ${deviceId}`);
+    this.logger.log(`Cihaz Redis'ten kaldırıldı: ${deviceId}`);
   }
 
   onModuleDestroy() {
-    this.client.disconnect();
+    this.client?.disconnect();
   }
 }

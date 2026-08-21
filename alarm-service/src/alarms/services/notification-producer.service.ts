@@ -9,6 +9,7 @@ import * as amqp from 'amqplib';
 export interface AlarmNotificationPayload {
   alarmId: string;
   deviceId: string;
+  deviceName: string;
   ruleName?: string;
   severity: string;
   triggerValue: number;
@@ -56,7 +57,7 @@ export class NotificationProducerService
 
     try {
       const messageBuffer = Buffer.from(JSON.stringify(payload));
-      this.channel.sendToQueue(this.queueName, messageBuffer, {
+      this.channel.sendToQueu(this.queueName, messageBuffer, {
         persistent: true,
       });
       this.logger.log(

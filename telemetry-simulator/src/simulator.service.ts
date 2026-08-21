@@ -7,14 +7,17 @@ import {
 import { KafkaService } from './kafka.service';
 import { timestamp } from 'rxjs';
 import { RabbitMQService } from './rabbitmq.service';
-import { SimulatorRedisService } from './redis/simulator-redis.service';
+import {
+  SimulatorRedisService,
+  DeviceInfo,
+} from './redis/simulator-redis.service';
 
 @Injectable()
 export class SimulatorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SimulatorService.name);
   private intervalId: NodeJS.Timeout;
 
-  private activeDeviceIds: Set<string> = new Set();
+  private activeDevices: Map<string, string> = new Map();
 
   constructor(
     private readonly KafkaService: KafkaService,
@@ -25,15 +28,22 @@ export class SimulatorService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     //Redisteki mevcut cihazları alıyoruz
     const existingDevices = await this.simulatorRedisService.getActiveDevices();
-    existingDevices.forEach((id) => this.activeDeviceIds.add(id));
-    this.logger.log(
-      `Başlangıçta ${this.activeDeviceIds.size} adet cihaz redis'ten yüklendi`,
-    );
+    existingDevices.forEach((device) => {
+      this.activeDevices.set(device.id, device.name);
+    });
 
     //yeni cihaz ekleme /silme olayları
     this.simulatorRedisService.subscribeToDeviceEvents(
-      (newDeviceId) => this.activeDeviceIds.add(newDeviceId),
-      (deletedDeviceId) => this.activeDeviceIds.delete(deletedDeviceId),
+      (newDevice: DeviceInfo) => {
+        this.activeDevices.set(newDevice.id, newDevice.name);
+        this.logger.log(
+          `Simülasyona cihaz eklendi: ${newDevice.name} (${newDevice.id})`,
+        );
+      },
+      (deletedDeviceId: string) => {
+        this.activeDevices.delete(deletedDeviceId);
+        this.logger.log(`Simülasyondan cihaz çıkarıldı: ${deletedDeviceId}`);
+      },
     );
 
     this.intervalId = setInterval(() => {
@@ -45,9 +55,10 @@ export class SimulatorService implements OnModuleInit, OnModuleDestroy {
   private async generateAndSendTelemetry() {
     const topic = 'iot.telemetry.raw';
     const routingKey = 'telemetry.data';
-    for (const deviceId of this.activeDeviceIds) {
+    for (const [deviceId, deviceName] of this.activeDevices.entries()) {
       const payload = {
         deviceId,
+        deviceName,
         timestamp: new Date().toISOString(),
         metrics: {
           temperature: parseFloat((20 + Math.random() * 70).toFixed(2)), // 20 - 90 °C
@@ -65,7 +76,7 @@ export class SimulatorService implements OnModuleInit, OnModuleDestroy {
         await this.KafkaService.sendTelemetry(topic, deviceId, payload);
 
         await this.RabbitMQService.sendTelemetry(routingKey, payload);
-        this.logger.log(`Telemetry gönderildi device : ${deviceId}`);
+        this.logger.log(`Telemetry gönderildi ${deviceName} : ${deviceId}`);
       } catch (error) {
         console.error(`Telemetry gönderim hatası ($deviceId)`, error);
       }

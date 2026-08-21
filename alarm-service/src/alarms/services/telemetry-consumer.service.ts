@@ -79,7 +79,7 @@ export class TelemetryConsumerService implements OnModuleInit, OnModuleDestroy {
   //Telemetry verisini kurallarla karşılaştırma
 
   private async processTelemetry(telemetryPayload: any) {
-    const { deviceId, metrics } = telemetryPayload;
+    const { deviceId, deviceName, metrics } = telemetryPayload;
 
     if (!deviceId || !metrics) return;
 
@@ -115,6 +115,7 @@ export class TelemetryConsumerService implements OnModuleInit, OnModuleDestroy {
           await this.notificationProducerService.sendAlarmNotification({
             alarmId: savedAlarm.id,
             deviceId: savedAlarm.deviceId,
+            deviceName: deviceName,
             ruleName: rule.metricName,
             severity: savedAlarm.severity,
             triggerValue: savedAlarm.triggerValue,

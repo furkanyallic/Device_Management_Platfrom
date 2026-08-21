@@ -1,11 +1,15 @@
 import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 
+export interface DeviceInfo {
+  id: string;
+  name: string;
+}
+
 @Injectable()
 export class SimulatorRedisService implements OnModuleDestroy {
   private readonly logger = new Logger(SimulatorRedisService.name);
 
-  // onModuleInit beklemeden doğrudan oluşturuyoruz (undefined kalma şansı sıfır)
   private readonly client: Redis;
   private readonly subscriber: Redis;
 
@@ -22,13 +26,24 @@ export class SimulatorRedisService implements OnModuleDestroy {
     );
   }
 
-  // Var olan kayıtları getir
-  async getActiveDevices(): Promise<string[]> {
-    return await this.client.smembers('active_devices');
+  // 1. Var olan kayıtları JSON parse ederek DeviceInfo[] olarak getir
+  async getActiveDevices(): Promise<DeviceInfo[]> {
+    const members = await this.client.smembers('active_devices');
+    return members
+      .map((item) => {
+        try {
+          return JSON.parse(item) as DeviceInfo;
+        } catch {
+          // Geriye dönük uyumluluk (eski veriler düz id string ise)
+          return { id: item, name: 'Bilinmeyen Cihaz' };
+        }
+      })
+      .filter((device) => Boolean(device.id));
   }
 
+  // 2. Pub/Sub mesajlarını JSON parse ederek yakala
   subscribeToDeviceEvents(
-    onDeviceCreated: (deviceId: string) => void,
+    onDeviceCreated: (device: DeviceInfo) => void,
     onDeviceDeleted: (deviceId: string) => void,
   ) {
     this.subscriber.subscribe('device.created', 'device.deleted', (err) => {
@@ -36,16 +51,33 @@ export class SimulatorRedisService implements OnModuleDestroy {
       else this.logger.log('Redis pub/sub (device.created/deleted) dinleniyor');
     });
 
-    this.subscriber.on('message', (channel, deviceId) => {
+    this.subscriber.on('message', (channel, message) => {
       if (channel === 'device.created') {
-        this.logger.log(
-          `Yeni cihaz algılandı, simülasyona ekleniyor: ${deviceId}`,
-        );
-        onDeviceCreated(deviceId);
+        try {
+          // message içeriği: JSON.stringify({ id, name })
+          const device: DeviceInfo =
+            typeof message === 'string' && message.startsWith('{')
+              ? JSON.parse(message)
+              : { id: message, name: 'Bilinmeyen Cihaz' };
+
+          this.logger.log(
+            `Yeni cihaz algılandı: ${device.name} (${device.id})`,
+          );
+          onDeviceCreated(device);
+        } catch (err) {
+          this.logger.error('device.created JSON parse hatası', err);
+        }
       } else if (channel === 'device.deleted') {
-        this.logger.log(
-          `Cihaz silindi, simülasyondan çıkarılıyor: ${deviceId}`,
-        );
+        // Silinirken sadece ID gelmesi yeterli
+        let deviceId = message;
+        try {
+          if (message.startsWith('{')) {
+            const parsed = JSON.parse(message);
+            deviceId = parsed.id;
+          }
+        } catch {}
+
+        this.logger.log(`Cihaz silindi: ${deviceId}`);
         onDeviceDeleted(deviceId);
       }
     });

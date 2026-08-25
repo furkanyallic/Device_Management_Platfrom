@@ -8,7 +8,6 @@ import { AlarmRuleService } from './alarm-rule.service';
 import { AlarmService } from './alarm-service';
 import * as amqp from 'amqplib';
 import { AlarmSeverity } from 'src/common/enums/alarm-severity';
-import { title } from 'process';
 import { NotificationProducerService } from './notification-producer.service';
 
 @Injectable()
@@ -51,7 +50,7 @@ export class TelemetryConsumerService implements OnModuleInit, OnModuleDestroy {
       );
 
       this.logger.log(
-        ` RabbitMQ Consumer dinlemede: Kuyrk : '${this.queueName}'`,
+        ` RabbitMQ Consumer dinlemede: Kuyruk : '${this.queueName}'`,
       );
 
       this.channel.consume(this.queueName, async (msg) => {
@@ -70,24 +69,23 @@ export class TelemetryConsumerService implements OnModuleInit, OnModuleDestroy {
       });
     } catch (error) {
       this.logger.error(
-        'RabbitMq bağlantı hatası ,5 sn sonra tekrar denenecek',
+        'RabbitMQ bağlantı hatası, 5 sn sonra tekrar denenecek',
       );
       setTimeout(() => this.connectAndListen(), 5000);
     }
   }
 
-  //Telemetry verisini kurallarla karşılaştırma
-
+  // Telemetry verisini kurallarla karşılaştırma
   private async processTelemetry(telemetryPayload: any) {
     const { deviceId, deviceName, metrics } = telemetryPayload;
 
     if (!deviceId || !metrics) return;
 
-    //Cihaza tanımlı kuralları db'den çek
+    // Cihaza tanımlı kuralları db'den çek
     const rules = await this.alarmRuleService.findByDeviceId(deviceId);
     if (!rules || rules.length === 0) return;
 
-    //Kuralı gelen metriklerle kıyasla
+    // Kuralı gelen metriklerle kıyasla
     for (const rule of rules) {
       const metricValue = metrics[rule.metricName];
 
@@ -103,24 +101,50 @@ export class TelemetryConsumerService implements OnModuleInit, OnModuleDestroy {
             `Alarm tetiklendi device:${deviceId} | ${rule.metricName}: ${metricValue} ${rule.operator} ${rule.threshold}`,
           );
 
-          //db'de otomatik alarm oluştur
+          // Aşım var: DB'ye kaydet ve bildirimi at
           const savedAlarm = await this.alarmService.create({
             deviceId,
             ruleId: rule.id,
-            title: `${rule.metricName.toUpperCase()} eşik değeri aşıldi`,
+            title: `${rule.metricName.toUpperCase()} eşik değeri aşıldı`,
             description: `${rule.metricName} metriği ${metricValue} değerine ulaştı`,
             severity: rule.severity || AlarmSeverity.WARNING,
             triggerValue: metricValue,
           });
+
           await this.notificationProducerService.sendAlarmNotification({
             alarmId: savedAlarm.id,
             deviceId: savedAlarm.deviceId,
-            deviceName: deviceName,
+            deviceName: deviceName || 'Bilinmeyen Cihaz',
             ruleName: rule.metricName,
             severity: savedAlarm.severity,
             triggerValue: savedAlarm.triggerValue,
             threshold: rule.threshold,
+            eventType: 'TRIGGERED',
           });
+        } else {
+          // Değer normale döndü: Açıkta kalan tüm alarmları tek seferde kapat
+          const resolvedCount = await this.alarmService.resolveAllActiveAlarms(
+            deviceId,
+            rule.id,
+          );
+
+          // SADECE daha önce açık alarm vardıysa ve yeni kapatıldıysa TEK BİR mail at
+          if (resolvedCount > 0) {
+            this.logger.log(
+              ` Alarm düzeldi (${resolvedCount} adet kayıt kapatıldı) -> Cihaz: ${deviceName || deviceId} | ${rule.metricName}: ${metricValue}`,
+            );
+
+            await this.notificationProducerService.sendAlarmNotification({
+              alarmId: deviceId,
+              deviceId,
+              deviceName: deviceName || 'Bilinmeyen Cihaz',
+              ruleName: rule.metricName,
+              severity: rule.severity || AlarmSeverity.WARNING,
+              triggerValue: metricValue,
+              threshold: rule.threshold,
+              eventType: 'RESOLVED',
+            });
+          }
         }
       }
     }
@@ -146,6 +170,7 @@ export class TelemetryConsumerService implements OnModuleInit, OnModuleDestroy {
         return false;
     }
   }
+
   async onModuleDestroy() {
     await this.channel?.close();
     await this.connection?.close();

@@ -19,6 +19,38 @@ export class AlarmService {
     return this.alarmRepository.save(alarm);
   }
 
+  //Aktif alarmları bul
+  async findActiveAlarms(
+    deviceId: string,
+    ruleId: string,
+  ): Promise<AlarmEntity | null> {
+    return await this.alarmRepository.findOne({
+      where: {
+        deviceId,
+        ruleId,
+        status: AlarmStatus.OPEN,
+      },
+    });
+  }
+  // Cihaz ve kurala ait OPEN durumdaki TÜM alarmları tek seferde kapatır
+  async resolveAllActiveAlarms(
+    deviceId: string,
+    ruleId: string,
+  ): Promise<number> {
+    const result = await this.alarmRepository.update(
+      {
+        deviceId,
+        ruleId,
+        status: AlarmStatus.OPEN,
+      },
+      {
+        status: AlarmStatus.RESOLVED,
+      },
+    );
+
+    // Güncellenen satır sayısını döner (Eğer 0 ise zaten açık alarm yoktu demektir)
+    return result.affected || 0;
+  }
   //Alarmları getir
   async findAll(): Promise<AlarmEntity[]> {
     return await this.alarmRepository.find({

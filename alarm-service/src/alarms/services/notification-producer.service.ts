@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import * as amqp from 'amqplib';
 
+export type AlarmEventType = 'TRIGGERED' | 'RESOLVED';
 export interface AlarmNotificationPayload {
   alarmId: string;
   deviceId: string;
@@ -14,6 +15,7 @@ export interface AlarmNotificationPayload {
   severity: string;
   triggerValue: number;
   threshold: number;
+  eventType: AlarmEventType;
 }
 
 @Injectable()
@@ -57,7 +59,7 @@ export class NotificationProducerService
 
     try {
       const messageBuffer = Buffer.from(JSON.stringify(payload));
-      this.channel.sendToQueu(this.queueName, messageBuffer, {
+      this.channel.sendToQueue(this.queueName, messageBuffer, {
         persistent: true,
       });
       this.logger.log(

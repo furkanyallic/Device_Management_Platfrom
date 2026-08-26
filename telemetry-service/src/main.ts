@@ -3,7 +3,7 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  // Endpointler için 3003 portunu belirledik
+  // Endpointler için 3007 portunu belirledik
   const app = await NestFactory.create(AppModule);
 
   // 2. Kafka Microservice Dinleyicisi (Consumer Group)
@@ -24,7 +24,7 @@ async function bootstrap() {
   // Microservice bağlantısını başlat
   await app.startAllMicroservices();
 
-  const port = process.env.PORT || 3003;
+  const port = process.env.PORT || 3007;
   await app.listen(port);
   console.log(` Telemetry Service running on port: ${port}`);
   console.log(` Kafka Consumer listening for telemetry stream...`);

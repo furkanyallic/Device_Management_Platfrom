@@ -140,9 +140,10 @@ export class NotificationService {
     return savedNotification;
   }
 
-  async findAll(): Promise<NotificationEntity[]> {
+  async findAll(limit: number = 20): Promise<NotificationEntity[]> {
     return await this.notificationRepository.find({
       order: { sent_at: 'DESC' },
+      take: limit,
     });
   }
 }

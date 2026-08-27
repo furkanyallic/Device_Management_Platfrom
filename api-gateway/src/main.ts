@@ -41,8 +41,9 @@ async function bootstrap() {
     createProxyMiddleware({
       target: process.env.TELEMETRY_SERVICE_URL || 'http://localhost:3007',
       changeOrigin: true,
-      pathRewrite: {
-        '^/api/telemetry': '/telemetry',
+      pathRewrite: (path) => {
+        // path = '/' ise '/devices', path = '/123' ise '/devices/123' yapar
+        return `/telemetry${path === '/' ? '' : path}`;
       },
     }),
   );
@@ -66,7 +67,7 @@ async function bootstrap() {
       changeOrigin: true,
       pathRewrite: (path) => {
         // path = '/' ise '/devices', path = '/123' ise '/devices/123' yapar
-        return `/alarms${path === '/' ? '' : path}`;
+        return `/alarm-rules${path === '/' ? '' : path}`;
       },
     }),
   );
@@ -76,8 +77,9 @@ async function bootstrap() {
     createProxyMiddleware({
       target: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3006',
       changeOrigin: true,
-      pathRewrite: {
-        '^/api/notifications': '/notifications',
+      pathRewrite: (path) => {
+        // path = '/' ise '/devices', path = '/123' ise '/devices/123' yapar
+        return `/notifications${path === '/' ? '' : path}`;
       },
     }),
   );

@@ -8,7 +8,9 @@ export interface Device {
   protocol: DeviceProtocol;
   status: DeviceStatus;
   created_at: string;
+  createdAt?: string;
   updated_at: string;
+  updatedAt?: string;
   deleted_at: string | null;
 }
 

@@ -140,6 +140,32 @@ export class NotificationService {
     return savedNotification;
   }
 
+  async findAllPaginated(
+    page: number = 1,
+    limit: number = 20,
+  ): Promise<{
+    data: NotificationEntity[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const skip = (page - 1) * limit;
+    const [data, total] = await this.notificationRepository.findAndCount({
+      order: { sent_at: 'DESC' },
+      take: limit,
+      skip,
+    });
+
+    return {
+      data,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+  }
+
   async findAll(limit: number = 20): Promise<NotificationEntity[]> {
     return await this.notificationRepository.find({
       order: { sent_at: 'DESC' },

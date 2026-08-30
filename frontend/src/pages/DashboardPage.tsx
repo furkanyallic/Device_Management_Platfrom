@@ -10,26 +10,34 @@ import type { Notification } from '../types/notification';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { SeverityBadge } from '../components/ui/SeverityBadge';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { formatDateTime } from '../utils/formatters';
 
 export const DashboardPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [devices, setDevices] = useState<Device[]>([]);
-  const [alarms, setAlarms] = useState<Alarm[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [recentAlarms, setRecentAlarms] = useState<Alarm[]>([]);
+  const [openAlarmsCount, setOpenAlarmsCount] = useState<number>(0);
+  const [recentNotifications, setRecentNotifications] = useState<Notification[]>([]);
+  const [totalNotifications, setTotalNotifications] = useState<number>(0);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [devRes, alarmRes, notifRes] = await Promise.allSettled([
+        const [devRes, alarmRes, openAlarmRes, notifRes] = await Promise.allSettled([
           deviceService.getAll(),
-          alarmService.getAll(),
-          notificationService.getAll(100),
+          alarmService.getAll(1, 5),
+          alarmService.getAll(1, 1, 'OPEN'),
+          notificationService.getAll(1, 5),
         ]);
 
         if (devRes.status === 'fulfilled') setDevices(Array.isArray(devRes.value) ? devRes.value : []);
-        if (alarmRes.status === 'fulfilled') setAlarms(Array.isArray(alarmRes.value) ? alarmRes.value : []);
-        if (notifRes.status === 'fulfilled') setNotifications(Array.isArray(notifRes.value) ? notifRes.value : []);
+        if (alarmRes.status === 'fulfilled') setRecentAlarms(alarmRes.value?.data || []);
+        if (openAlarmRes.status === 'fulfilled') setOpenAlarmsCount(openAlarmRes.value?.total || 0);
+        if (notifRes.status === 'fulfilled') {
+          setRecentNotifications(notifRes.value?.data || []);
+          setTotalNotifications(notifRes.value?.total || 0);
+        }
       } catch (error) {
         console.error('Dashboard verisi yüklenirken hata:', error);
       } finally {
@@ -42,11 +50,6 @@ export const DashboardPage: React.FC = () => {
 
   const totalDevices = devices.length;
   const activeDevices = devices.filter((d) => d.status === 'ACTIVE').length;
-  const openAlarms = alarms.filter((a) => a.status === 'OPEN').length;
-  const totalNotifications = notifications.length;
-
-  const recentAlarms = alarms.slice(0, 5);
-  const recentNotifications = notifications.slice(0, 5);
 
   if (loading) {
     return <LoadingSpinner message="Dashboard verileri yükleniyor..." />;
@@ -84,7 +87,7 @@ export const DashboardPage: React.FC = () => {
         <div className="flex justify-between rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <div>
             <p className="text-xs font-medium text-slate-500">Açık Alarmlar</p>
-            <h3 className="mt-1 text-2xl font-bold text-slate-800">{openAlarms}</h3>
+            <h3 className="mt-1 text-2xl font-bold text-slate-800">{openAlarmsCount}</h3>
             <p className="mt-1 text-[11px] text-slate-400">Müdahale bekleyen alarmlar</p>
           </div>
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
@@ -147,8 +150,8 @@ export const DashboardPage: React.FC = () => {
                       <td className="py-2.5">
                         <StatusBadge status={alarm.status} variant="alarm" />
                       </td>
-                      <td className="py-2.5 text-[11px] text-slate-400">
-                        {new Date(alarm.created_at).toLocaleDateString('tr-TR')}
+                      <td className="py-2.5 text-[11px] text-slate-400 font-mono">
+                        {formatDateTime(alarm.createdAt || alarm.created_at)}
                       </td>
                     </tr>
                   ))}
@@ -191,8 +194,8 @@ export const DashboardPage: React.FC = () => {
                     >
                       {notif.status}
                     </span>
-                    <p className="text-[10px] text-slate-400">
-                      {new Date(notif.sent_at).toLocaleDateString('tr-TR')}
+                    <p className="text-[10px] text-slate-400 font-mono">
+                      {formatDateTime(notif.sent_at || notif.sentAt)}
                     </p>
                   </div>
                 </div>

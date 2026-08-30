@@ -2,8 +2,6 @@ import {
   Get,
   Query,
   Controller,
-  DefaultValuePipe,
-  ParseIntPipe,
 } from '@nestjs/common';
 import { NotificationService } from './services/notification.service';
 
@@ -13,8 +11,11 @@ export class NotificationController {
 
   @Get()
   async getAllNotifications(
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
-    return await this.notificationService.findAll(limit);
+    const pageNum = page ? Math.max(1, parseInt(page, 10)) : 1;
+    const limitNum = limit ? Math.max(1, parseInt(limit, 10)) : 20;
+    return await this.notificationService.findAllPaginated(pageNum, limitNum);
   }
 }

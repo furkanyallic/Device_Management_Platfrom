@@ -1,15 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Pencil, Trash2, Activity, Bell, Settings } from 'lucide-react';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from 'recharts';
 import { deviceService } from '../services/deviceService';
 import { telemetryService } from '../services/telemetryService';
 import { alarmService } from '../services/alarmService';
@@ -23,6 +14,7 @@ import { CreateDeviceModal } from '../components/CreateDeviceModal';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { Toast, type ToastType } from '../components/ui/Toast';
+import { formatDateTime } from '../utils/formatters';
 
 export const DeviceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -39,6 +31,21 @@ export const DeviceDetailPage: React.FC = () => {
   const [deleteLoading, setDeleteLoading] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null);
 
+  const fetchTelemetry = async () => {
+    if (!id) return;
+    try {
+      const telData = await telemetryService.getLatestByDevice(id, 50);
+      const sorted = [...(telData || [])].sort((a, b) => {
+        const timeA = new Date(a.timestamp || a.createdAt || 0).getTime();
+        const timeB = new Date(b.timestamp || b.createdAt || 0).getTime();
+        return timeB - timeA;
+      });
+      setTelemetry(sorted);
+    } catch (err) {
+      console.error('Telemetri verisi güncellenemedi:', err);
+    }
+  };
+
   const fetchDeviceDetails = async () => {
     if (!id) return;
     setLoading(true);
@@ -46,15 +53,15 @@ export const DeviceDetailPage: React.FC = () => {
       const dev = await deviceService.getById(id);
       setDevice(dev);
 
-      const [telRes, alarmRes, ruleRes] = await Promise.allSettled([
-        telemetryService.getLatestByDevice(id, 50),
+      const [alarmRes, ruleRes] = await Promise.allSettled([
         alarmService.getByDevice(id),
         alarmRuleService.getByDevice(id),
       ]);
 
-      if (telRes.status === 'fulfilled') setTelemetry(telRes.value || []);
       if (alarmRes.status === 'fulfilled') setAlarms(alarmRes.value || []);
       if (ruleRes.status === 'fulfilled') setAlarmRules(ruleRes.value || []);
+
+      await fetchTelemetry();
     } catch (error) {
       console.error('Cihaz detayları yüklenemedi:', error);
       setToast({ message: 'Cihaz detayları alınamadı.', type: 'error' });
@@ -65,6 +72,14 @@ export const DeviceDetailPage: React.FC = () => {
 
   useEffect(() => {
     fetchDeviceDetails();
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    const interval = setInterval(() => {
+      fetchTelemetry();
+    }, 3000);
+    return () => clearInterval(interval);
   }, [id]);
 
   const handleUpdateDevice = async (data: CreateDeviceDto | UpdateDeviceDto) => {
@@ -95,6 +110,26 @@ export const DeviceDetailPage: React.FC = () => {
     }
   };
 
+  // Tüm telemetri kayıtlarından benzersiz metrik isimlerini toplayalım
+  const metricKeys = Array.from(
+    new Set(
+      telemetry.flatMap((t) => (t.metrics ? Object.keys(t.metrics) : []))
+    )
+  );
+
+  const formatMetricHeader = (key: string): string => {
+    const map: Record<string, string> = {
+      temperature: 'Sıcaklık (°C)',
+      humidity: 'Nem (%)',
+      voltage: 'Voltaj (V)',
+      current: 'Akım (A)',
+      pressure: 'Basınç (bar)',
+      battery: 'Batarya (%)',
+      speed: 'Hız (km/h)',
+    };
+    return map[key.toLowerCase()] || key;
+  };
+
   if (loading) {
     return <LoadingSpinner message="Cihaz detayları yükleniyor..." />;
   }
@@ -109,21 +144,6 @@ export const DeviceDetailPage: React.FC = () => {
       </div>
     );
   }
-
-  // Format chart data
-  const chartData = [...telemetry].reverse().map((t) => ({
-    time: new Date(t.timestamp || t.createdAt).toLocaleTimeString('tr-TR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-    temperature: t.metrics?.temperature ?? null,
-    humidity: t.metrics?.humidity ?? null,
-    voltage: t.metrics?.voltage ?? null,
-    current: t.metrics?.current ?? null,
-  }));
-
-  const latestTelemetry = telemetry[0];
-  const latestMetrics = latestTelemetry?.metrics || {};
 
   return (
     <div className="space-y-6">
@@ -179,77 +199,69 @@ export const DeviceDetailPage: React.FC = () => {
           </div>
           <div>
             <p className="text-[11px] font-medium text-slate-400">Oluşturulma Tarihi</p>
-            <p className="mt-1 text-xs text-slate-600">
-              {device.created_at ? new Date(device.created_at).toLocaleDateString('tr-TR') : '-'}
+            <p className="mt-1 text-xs text-slate-600 font-mono">
+              {formatDateTime(device.created_at || device.createdAt)}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Telemetri Grafikleri & Metrik Kartları */}
+      {/* Telemetri Kayıtları Tablosu (Sütun Bazlı Görünüm) */}
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <Activity className="text-blue-500" size={18} />
-            <h3 className="text-sm font-bold text-slate-800">Telemetri Verileri (Son 50 Kayıt)</h3>
+            <h3 className="text-sm font-bold text-slate-800">Telemetri Kayıtları (Son 50 Kayıt)</h3>
           </div>
-          <span className="text-[11px] text-slate-400">Canlı Metrik Takibi</span>
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span className="text-[11px] font-semibold text-emerald-700">Canlı Veri Akışı</span>
+          </div>
         </div>
 
-        {chartData.length === 0 ? (
+        {telemetry.length === 0 ? (
           <div className="py-12 text-center text-xs text-slate-400">
-            Bu cihaza ait telemetri verisi bulunmuyor.
+            Bu cihaza ait telemetri kaydı bulunmuyor.
           </div>
         ) : (
-          <>
-            {/* Metrik Kartları */}
-            <div className="flex flex-wrap gap-3 pt-2">
-              {Object.entries(latestMetrics).map(([key, val]) => (
-                <div
-                  key={key}
-                  className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs"
-                >
-                  <span className="font-medium text-slate-500 capitalize">{key}:</span>
-                  <span className="font-bold text-slate-800">{String(val)}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Recharts Grafiği */}
-            <div className="h-64 w-full pt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="time" stroke="#94a3b8" fontSize={11} />
-                  <YAxis stroke="#94a3b8" fontSize={11} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#ffffff',
-                      borderColor: '#e2e8f0',
-                      borderRadius: '0.375rem',
-                      fontSize: '0.75rem',
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="temperature"
-                    name="Sıcaklık (°C)"
-                    stroke="#ef4444"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="humidity"
-                    name="Nem (%)"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 uppercase tracking-wider font-semibold">
+                  <th className="px-4 py-3 whitespace-nowrap">Tarih / Saat</th>
+                  {metricKeys.map((key) => (
+                    <th key={key} className="px-4 py-3 whitespace-nowrap">
+                      {formatMetricHeader(key)}
+                    </th>
+                  ))}
+                  <th className="px-4 py-3 text-right whitespace-nowrap">Kayıt ID</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-slate-700">
+                {telemetry.map((t) => (
+                  <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-4 py-3 font-mono text-slate-800 font-medium whitespace-nowrap">
+                      {formatDateTime(t.timestamp || t.createdAt)}
+                    </td>
+                    {metricKeys.map((key) => {
+                      const val = t.metrics ? t.metrics[key] : undefined;
+                      return (
+                        <td key={key} className="px-4 py-3 font-mono font-semibold text-slate-800 whitespace-nowrap">
+                          {val !== undefined && val !== null ? String(val) : '-'}
+                        </td>
+                      );
+                    })}
+                    <td className="px-4 py-3 font-mono text-[11px] text-slate-400 text-right whitespace-nowrap">
+                      {t.id ? t.id.substring(0, 8) + '...' : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

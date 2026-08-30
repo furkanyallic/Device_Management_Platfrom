@@ -1,15 +1,14 @@
 import { api } from "./api";
-import type {
-  Alarm,
-  AlarmStatus,
-  CreateAlarmDto,
-  UpdateAlarmStatusDto,
-} from "../types/alarm";
+import type { Alarm, AlarmStatus, CreateAlarmDto, UpdateAlarmStatusDto, PaginatedResponse } from "../types/alarm";
 
 export const alarmService = {
-  getAll: async (status?: AlarmStatus): Promise<Alarm[]> => {
-    const response = await api.get<Alarm[]>("/alarms", {
-      params: status ? { status } : undefined,
+  getAll: async (page: number = 1, limit: number = 20, status?: AlarmStatus): Promise<PaginatedResponse<Alarm>> => {
+    const response = await api.get<PaginatedResponse<Alarm>>("/alarms", {
+      params: {
+        page,
+        limit,
+        status: status || undefined,
+      },
     });
     return response.data;
   },
@@ -29,10 +28,7 @@ export const alarmService = {
     return response.data;
   },
 
-  updateStatus: async (
-    id: string,
-    data: UpdateAlarmStatusDto,
-  ): Promise<Alarm> => {
+  updateStatus: async (id: string, data: UpdateAlarmStatusDto): Promise<Alarm> => {
     const response = await api.patch<Alarm>(`/alarms/${id}/status`, data);
     return response.data;
   },

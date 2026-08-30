@@ -8,5 +8,6 @@ export interface Notification {
   status: NotificationStatus;
   alarm_id: string | null;
   device_id: string | null;
-  sent_at: string;
+  sent_at?: string;
+  sentAt?: string;
 }

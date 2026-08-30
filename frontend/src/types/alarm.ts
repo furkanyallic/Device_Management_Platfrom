@@ -1,6 +1,14 @@
 export type AlarmSeverity = 'INFO' | 'WARNING' | 'CRITICAL';
 export type AlarmStatus = 'OPEN' | 'ACKNOWLEDGED' | 'RESOLVED';
 
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface Alarm {
   id: string;
   deviceId: string;
@@ -10,8 +18,10 @@ export interface Alarm {
   severity: AlarmSeverity;
   status: AlarmStatus;
   triggerValue: number | null;
-  created_at: string;
-  updated_at: string;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
 }
 
 export interface CreateAlarmDto {
@@ -36,8 +46,10 @@ export interface AlarmRule {
   threshold: number;
   severity: AlarmSeverity;
   isActive: boolean;
-  created_at: string;
-  updated_at: string;
+  createdAt?: string;
+  created_at?: string;
+  updatedAt?: string;
+  updated_at?: string;
 }
 
 export interface CreateAlarmRuleDto {

@@ -15,7 +15,9 @@ export class CreateAlarmDto {
   deviceId: string;
 
   @IsUUID()
-  @IsOptional()
+  @IsNotEmpty({
+    message: 'ruleId alanı zorunludur. Lütfen geçerli bir kural seçin.',
+  })
   ruleId: string;
 
   @IsString()

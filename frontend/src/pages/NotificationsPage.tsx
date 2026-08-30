@@ -1,33 +1,51 @@
 import React, { useEffect, useState } from 'react';
-import { Mail, Eye } from 'lucide-react';
+import { Mail, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 import { notificationService } from '../services/notificationService';
 import type { Notification } from '../types/notification';
 import { Modal } from '../components/ui/Modal';
 import { EmptyState } from '../components/ui/EmptyState';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
+import { formatDateTime } from '../utils/formatters';
 
 export const NotificationsPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [selectedNotif, setSelectedNotif] = useState<Notification | null>(null);
 
+  // Pagination states
+  const [page, setPage] = useState<number>(1);
+  const [limit, setLimit] = useState<number>(20);
+  const [total, setTotal] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
+
+  const fetchNotifications = async () => {
+    setLoading(true);
+    try {
+      const response = await notificationService.getAll(page, limit);
+      setNotifications(response.data || []);
+      setTotal(response.total || 0);
+      setTotalPages(response.totalPages || 1);
+    } catch (error) {
+      console.error('Bildirimler yüklenemedi:', error);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchNotifications = async () => {
-      setLoading(true);
-      try {
-        const data = await notificationService.getAll(50);
-        setNotifications(data);
-      } catch (error) {
-        console.error('Bildirimler yüklenemedi:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchNotifications();
-  }, []);
+  }, [page, limit]);
 
-  if (loading) {
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1);
+  };
+
+  const startRecord = (page - 1) * limit + 1;
+  const endRecord = Math.min(page * limit, total);
+
+  if (loading && notifications.length === 0) {
     return <LoadingSpinner message="Bildirim geçmişi yükleniyor..." />;
   }
 
@@ -36,7 +54,9 @@ export const NotificationsPage: React.FC = () => {
       {/* Üst Alan */}
       <div>
         <h2 className="text-xl font-bold tracking-tight text-slate-800">Bildirim Geçmişi</h2>
-        <p className="text-xs text-slate-500">Sistem tarafından gönderilen e-posta ve uyarı bildirimlerinin dökümü</p>
+        <p className="text-xs text-slate-500">
+          Sistem tarafından gönderilen e-posta ve uyarı bildirimlerinin dökümü (Toplam: {total})
+        </p>
       </div>
 
       {/* Tablo */}
@@ -79,8 +99,8 @@ export const NotificationsPage: React.FC = () => {
                         {notif.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-400">
-                      {notif.sent_at ? new Date(notif.sent_at).toLocaleString('tr-TR') : '-'}
+                    <td className="px-4 py-3 text-slate-400 font-mono">
+                      {formatDateTime(notif.sent_at || notif.sentAt)}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
@@ -95,6 +115,51 @@ export const NotificationsPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Sayfalama Alt Barı */}
+          <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between text-xs text-slate-600">
+            <div className="flex items-center gap-4">
+              <span>
+                Toplam <strong>{total}</strong> kayıttan <strong>{total > 0 ? startRecord : 0}-{endRecord}</strong> arası gösteriliyor
+              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400">Sayfa başı:</span>
+                <select
+                  value={limit}
+                  onChange={(e) => handleLimitChange(Number(e.target.value))}
+                  className="rounded border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 focus:outline-none"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-slate-500 font-medium">
+                Sayfa {page} / {totalPages}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="rounded border border-slate-200 bg-white p-1 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-colors"
+                  title="Önceki Sayfa"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="rounded border border-slate-200 bg-white p-1 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-colors"
+                  title="Sonraki Sayfa"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -114,8 +179,8 @@ export const NotificationsPage: React.FC = () => {
               </div>
               <div>
                 <span className="font-semibold text-slate-500">Tarih:</span>{' '}
-                <span className="text-slate-800">
-                  {new Date(selectedNotif.sent_at).toLocaleString('tr-TR')}
+                <span className="text-slate-800 font-mono">
+                  {formatDateTime(selectedNotif.sent_at || selectedNotif.sentAt)}
                 </span>
               </div>
               <div>

@@ -23,11 +23,14 @@ export class AlarmController {
   }
 
   @Get()
-  findAll(@Query('status') status?: AlarmStatus) {
-    if (status) {
-      return this.alarmService.findByStatus(status);
-    }
-    return this.alarmService.findAll();
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: AlarmStatus,
+  ) {
+    const pageNum = page ? Math.max(1, parseInt(page, 10)) : 1;
+    const limitNum = limit ? Math.max(1, parseInt(limit, 10)) : 20;
+    return this.alarmService.findAllPaginated(pageNum, limitNum, status);
   }
 
   @Get('device/:deviceId')

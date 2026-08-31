@@ -30,4 +30,8 @@ export const alarmRuleService = {
   delete: async (id: string): Promise<void> => {
     await api.delete(`/alarm-rules/${id}`);
   },
+
+  deleteByDevice: async (deviceId: string): Promise<void> => {
+    await api.delete(`/alarm-rules/device/${deviceId}`);
+  },
 };

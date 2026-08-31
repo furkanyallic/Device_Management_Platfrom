@@ -59,7 +59,8 @@ export class RabbitMQConsumerService implements OnModuleInit, OnModuleDestroy {
         }
       });
     } catch (error) {
-      this.logger.error('Rabbitmq bağlantı hatası', error);
+      this.logger.error('Rabbitmq bağlantı hatası, 5 sn sonra tekrar denenecek', error);
+      setTimeout(() => this.connectAndConsume(), 5000);
     }
   }
 

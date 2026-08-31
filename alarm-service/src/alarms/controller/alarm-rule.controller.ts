@@ -44,4 +44,9 @@ export class AlarmRuleController {
   remove(@Param('id') id: string) {
     return this.alarmRuleService.remove(id);
   }
+
+  @Delete('device/:deviceId')
+  removeByDeviceId(@Param('deviceId') deviceId: string) {
+    return this.alarmRuleService.removeByDeviceId(deviceId);
+  }
 }

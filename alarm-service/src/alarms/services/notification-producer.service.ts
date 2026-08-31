@@ -45,7 +45,8 @@ export class NotificationProducerService
         ` RabbitMQ Bildirim Producer hazır. Hedef Kuyruk: [${this.queueName}]`,
       );
     } catch (error) {
-      this.logger.error(' RabbitMQ Producer bağlantı hatası:', error);
+      this.logger.error(' RabbitMQ Producer bağlantı hatası, 5 sn sonra tekrar denenecek:', error);
+      setTimeout(() => this.initRabbitMQ(), 5000);
     }
   }
 
@@ -53,7 +54,8 @@ export class NotificationProducerService
     payload: AlarmNotificationPayload,
   ): Promise<void> {
     if (!this.channel) {
-      this.logger.error('Rabbitmq kanalı açık değil,bildirim gönderilemedi');
+      this.logger.error('Rabbitmq kanalı açık değil, tekrar bağlanılıyor...');
+      this.initRabbitMQ();
       return;
     }
 

@@ -54,4 +54,10 @@ export class AlarmRuleService {
     const rule = await this.findOne(id);
     await this.ruleRepository.remove(rule);
   }
+
+  // 7. Cihaza ait tüm kuralları sil
+  async removeByDeviceId(deviceId: string): Promise<number> {
+    const result = await this.ruleRepository.delete({ deviceId });
+    return result.affected || 0;
+  }
 }

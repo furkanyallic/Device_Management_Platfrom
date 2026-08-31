@@ -67,5 +67,18 @@ export class DevicesService {
     await this.deviceRepository.remove(device);
 
     await this.redisService.removeDevice(id);
+
+    try {
+      const alarmServiceUrl =
+        process.env.ALARM_SERVICE_URL || 'http://localhost:3004';
+      await fetch(`${alarmServiceUrl}/alarm-rules/device/${id}`, {
+        method: 'DELETE',
+      });
+    } catch (err) {
+      console.error(
+        `[DevicesService] Alarm kuralları silinirken hata oluştu (Device ID: ${id}):`,
+        err,
+      );
+    }
   }
 }
